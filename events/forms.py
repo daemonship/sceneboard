@@ -2,7 +2,7 @@
 from django import forms
 from django.utils import timezone
 
-from .models import Event, Genre, Venue
+from .models import Event, EventStatus, Genre, Venue
 
 
 class EventSubmissionForm(forms.ModelForm):
@@ -92,7 +92,7 @@ class EventSubmissionForm(forms.ModelForm):
         Save the event with pending status and optional submitter IP.
         """
         instance = super().save(commit=False)
-        instance.status = "pending"  # Always pending for submissions
+        instance.status = EventStatus.PENDING
         instance.source = "user submission"
         if submitter_ip:
             instance.submitter_ip = submitter_ip

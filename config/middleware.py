@@ -1,11 +1,15 @@
 """
 IP-based rate limiting middleware for event submissions.
-Limits submissions to 20 per day per IP address.
+Limits submissions to a configurable number per day per IP address.
 """
+
+import logging
 
 from django.conf import settings
 from django.core.cache import cache
 from django.http import HttpResponseForbidden
+
+logger = logging.getLogger(__name__)
 
 
 class SubmissionRateLimiter:
@@ -36,15 +40,18 @@ class SubmissionRateLimiter:
             if request.method == "POST":
                 client_ip = self.get_client_ip(request)
 
-                if not self.is_allowed(client_ip):
+                if not self.is_allowed(client_ip, request):
                     return HttpResponseForbidden(
-                        content=b"""<!DOCTYPE html>
-<html><head><title>Rate Limited</title></head>
-<body style="font-family: system-ui; padding: 40px; text-align: center;">
-<h1>Too Many Submissions</h1>
-<p>You have exceeded the maximum number of event submissions (20 per day).</p>
-<p>Please try again tomorrow.</p>
-</body></html>""",
+                        content=(
+                            f"<!DOCTYPE html>"
+                            f"<html><head><title>Rate Limited</title></head>"
+                            f"<body style=\"font-family: system-ui; padding: 40px; text-align: center;\">"
+                            f"<h1>Too Many Submissions</h1>"
+                            f"<p>You have exceeded the maximum number of event submissions"
+                            f" ({self.max_submissions} per day).</p>"
+                            f"<p>Please try again tomorrow.</p>"
+                            f"</body></html>"
+                        ).encode(),
                         content_type="text/html",
                     )
 
@@ -63,13 +70,18 @@ class SubmissionRateLimiter:
             ip = request.META.get("REMOTE_ADDR")
         return ip
 
-    def is_allowed(self, ip_address):
+    def is_allowed(self, ip_address, request=None):
         """
         Check if the IP address is allowed to submit based on rate limits.
         Returns True if allowed, False if rate limited.
         """
         if not ip_address:
-            # No IP found - allow but log (could also block)
+            logger.warning(
+                "SubmissionRateLimiter: could not determine client IP for %s %s; "
+                "rate limiting bypassed. Check proxy configuration.",
+                request.method if request else "UNKNOWN",
+                request.path if request else "UNKNOWN",
+            )
             return True
 
         cache_key = f"rate_limit:submit:{ip_address}"
@@ -80,14 +92,27 @@ class SubmissionRateLimiter:
         if current_count >= self.max_submissions:
             return False
 
-        # Increment counter
-        # Use cache.add to only set if not exists, then increment
-        # This is a simple approach - in production you might use Redis atomic ops
+        # Increment counter atomically where possible.
+        # Note: LocMemCache is per-process; use Redis in multi-worker production.
         try:
-            # Try to increment atomically
             cache.incr(cache_key)
         except ValueError:
-            # Key doesn't exist - set it with the timeout
-            cache.set(cache_key, 1, self.TIMEOUT_SECONDS)
+            # Key doesn't exist yet — initialize it with the TTL
+            try:
+                cache.set(cache_key, 1, self.TIMEOUT_SECONDS)
+            except Exception as exc:
+                logger.error(
+                    "SubmissionRateLimiter: cache.set() failed for IP %s: %s",
+                    ip_address,
+                    exc,
+                    exc_info=True,
+                )
+        except Exception as exc:
+            logger.error(
+                "SubmissionRateLimiter: cache.incr() failed for IP %s: %s",
+                ip_address,
+                exc,
+                exc_info=True,
+            )
 
         return True

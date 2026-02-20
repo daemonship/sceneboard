@@ -1,9 +1,16 @@
+import logging
+
+from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .forms import EventSubmissionForm
 from .models import Event, EventStatus, Genre
+
+logger = logging.getLogger(__name__)
 
 
 def _get_date_bounds(date_range):
@@ -106,29 +113,43 @@ def event_submit(request):
     Creates events with pending status for moderation.
     Rate limiting is enforced by middleware.
     """
-    # Check if user is rate limited (middleware sets this flag)
-    # We also check here to show a friendly message instead of the form
-    from django.core.cache import cache
-
+    # Check if user is rate limited to show a friendly message instead of the form.
+    # The middleware blocks the actual POST; this check only affects the GET display.
     client_ip = _get_client_ip(request)
     cache_key = f"rate_limit:submit:{client_ip}"
     current_count = cache.get(cache_key, 0)
-    max_submissions = 20
+    max_submissions = getattr(settings, "RATE_LIMIT_SUBMISSIONS", 20)
 
     rate_limited = current_count >= max_submissions
 
     if request.method == "POST" and not rate_limited:
         form = EventSubmissionForm(request.POST)
         if form.is_valid():
-            event = form.save(commit=False)
-            event.submitter_ip = client_ip
-            event.save()
-            form.save_m2m()
+            try:
+                with transaction.atomic():
+                    event = form.save(commit=False)
+                    event.submitter_ip = client_ip
+                    event.save()
+                    form.save_m2m()
+            except Exception:
+                logger.exception(
+                    "event_submit: failed to save event from IP %s", client_ip
+                )
+                messages.error(
+                    request,
+                    "Sorry, there was a problem saving your submission. "
+                    "Please try again.",
+                )
+                return render(
+                    request,
+                    "events/submit.html",
+                    {"form": form, "rate_limited": rate_limited},
+                )
 
             messages.success(
                 request,
                 "Thank you! Your event has been submitted and is awaiting moderation. "
-                "It will appear on the site once approved."
+                "It will appear on the site once approved.",
             )
             return redirect("event_feed")
     else:
@@ -137,5 +158,5 @@ def event_submit(request):
     return render(
         request,
         "events/submit.html",
-        {"form": form, "rate_limited": rate_limited}
+        {"form": form, "rate_limited": rate_limited},
     )

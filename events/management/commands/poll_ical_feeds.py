@@ -163,7 +163,13 @@ class Command(BaseCommand):
             else:
                 # date-only — treat as midnight UTC
                 return datetime(val.year, val.month, val.day, tzinfo=dt_timezone.utc)
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "DTSTART parse failed for VEVENT SUMMARY=%r (dtstart=%r): %s",
+                component.get("SUMMARY", "<no summary>"),
+                dtstart,
+                exc,
+            )
             return None
 
     def _is_duplicate(self, venue: Venue, event_dt: datetime, name: str) -> bool:

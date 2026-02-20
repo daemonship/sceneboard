@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import Event, Genre, Venue
+from .models import Event, EventStatus, Genre, Venue
 
 
 @admin.register(Genre)
@@ -76,20 +76,23 @@ class EventAdmin(admin.ModelAdmin):
     status_badge.short_description = "Status"
 
     def approve_events(self, request, queryset):
-        """Bulk action to approve events."""
-        updated = queryset.update(status="approved")
+        """Bulk action to approve events.
+
+        Note: uses queryset.update() which bypasses model save() and signals.
+        If approval side effects are ever added to save(), switch to per-object iteration.
+        """
+        updated = queryset.update(status=EventStatus.APPROVED)
         self.message_user(request, f"{updated} event(s) approved.")
 
     approve_events.short_description = "Approve selected events"
 
     def reject_events(self, request, queryset):
-        """Bulk action to reject events."""
-        updated = queryset.update(status="rejected")
+        """Bulk action to reject events.
+
+        Note: uses queryset.update() which bypasses model save() and signals.
+        If rejection side effects are ever added to save(), switch to per-object iteration.
+        """
+        updated = queryset.update(status=EventStatus.REJECTED)
         self.message_user(request, f"{updated} event(s) rejected.")
 
     reject_events.short_description = "Reject selected events"
-
-    def get_queryset(self, request):
-        """Show pending events first by default."""
-        qs = super().get_queryset(request)
-        return qs
