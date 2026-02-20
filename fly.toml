@@ -27,3 +27,12 @@ primary_region = "iad"
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 256
+
+# iCal feed ingestion — run every 6 hours with a scheduled Fly Machine:
+#
+#   fly machine run --app sceneboard \
+#     --schedule every_6h \
+#     --entrypoint "python manage.py poll_ical_feeds" \
+#     .
+#
+# See: https://fly.io/docs/machines/run-a-machine-on-a-schedule/

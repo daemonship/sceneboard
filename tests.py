@@ -1,4 +1,9 @@
 """Tests for SceneBoard Django project."""
+import urllib.error
+from datetime import timezone as dt_timezone
+from io import StringIO
+from unittest.mock import MagicMock, patch
+
 import pytest
 from django.test import Client
 from django.urls import reverse
@@ -418,3 +423,261 @@ def test_submission_form_redirects_after_success(client, venue):
     # Event should be created with pending status
     event = Event.objects.get(name="Success Redirect Show")
     assert event.status == EventStatus.PENDING
+
+
+# ── iCal Feed Ingestion Tests ────────────────────────────────────────────────
+
+
+def make_ical(events: list[dict]) -> bytes:
+    """Build a minimal but valid iCal feed from a list of event dicts.
+
+    Each dict may have: summary, dtstart (str, e.g. '20260301T200000Z'),
+    description, url.
+    """
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//SceneBoard Test//EN"]
+    for ev in events:
+        lines += [
+            "BEGIN:VEVENT",
+            f"SUMMARY:{ev['summary']}",
+            f"DTSTART:{ev['dtstart']}",
+            f"DTEND:{ev.get('dtend', ev['dtstart'])}",
+        ]
+        if "description" in ev:
+            lines.append(f"DESCRIPTION:{ev['description']}")
+        if "url" in ev:
+            lines.append(f"URL:{ev['url']}")
+        lines.append("END:VEVENT")
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines).encode()
+
+
+@pytest.fixture
+def ical_venue(db):
+    return Venue.objects.create(
+        name="Bottom of the Hill",
+        address="1233 17th St, San Francisco, CA",
+        ical_feed_url="https://example.com/feed.ics",
+    )
+
+
+def run_command(*args, **kwargs):
+    """Call the poll_ical_feeds management command and return stdout output."""
+    from django.core.management import call_command
+
+    out = StringIO()
+    err = StringIO()
+    call_command("poll_ical_feeds", *args, stdout=out, stderr=err, **kwargs)
+    return out.getvalue(), err.getvalue()
+
+
+def mock_fetch(ical_bytes):
+    """Return a context manager mock that yields a response with .read()."""
+    resp = MagicMock()
+    resp.read.return_value = ical_bytes
+    resp.__enter__ = lambda s: resp
+    resp.__exit__ = MagicMock(return_value=False)
+    return resp
+
+
+@pytest.mark.django_db
+def test_poll_creates_events(ical_venue):
+    """Valid iCal feed creates auto-approved events."""
+    feed = make_ical(
+        [{"summary": "Night Owls", "dtstart": "20260310T200000Z"}]
+    )
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        run_command()
+
+    assert Event.objects.filter(name="Night Owls").exists()
+    event = Event.objects.get(name="Night Owls")
+    assert event.status == EventStatus.APPROVED
+    assert event.venue == ical_venue
+    assert event.source == f"iCal: {ical_venue.name}"
+
+
+@pytest.mark.django_db
+def test_poll_sets_last_polled(ical_venue):
+    """last_polled is updated on the venue after a successful poll."""
+    assert ical_venue.last_polled is None
+    feed = make_ical([{"summary": "Show", "dtstart": "20260310T200000Z"}])
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        run_command()
+
+    ical_venue.refresh_from_db()
+    assert ical_venue.last_polled is not None
+
+
+@pytest.mark.django_db
+def test_poll_skips_past_events(ical_venue):
+    """Events more than 1 hour in the past are not imported."""
+    feed = make_ical([{"summary": "Old Show", "dtstart": "20200101T200000Z"}])
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        run_command()
+
+    assert not Event.objects.filter(name="Old Show").exists()
+
+
+@pytest.mark.django_db
+def test_poll_deduplicates_events(ical_venue):
+    """Importing the same feed twice does not create duplicate events."""
+    feed = make_ical([{"summary": "Dupe Show", "dtstart": "20260315T200000Z"}])
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        run_command()
+        run_command()
+
+    assert Event.objects.filter(name="Dupe Show").count() == 1
+
+
+@pytest.mark.django_db
+def test_poll_deduplicates_normalized_names(ical_venue):
+    """Deduplication ignores case and extra whitespace in event names."""
+    feed = make_ical([{"summary": "  Night  Owls  ", "dtstart": "20260315T200000Z"}])
+    # Pre-create an event with slightly different formatting
+    Event.objects.create(
+        name="Night Owls",
+        datetime=timezone.datetime(2026, 3, 15, 20, 0, 0, tzinfo=dt_timezone.utc),
+        venue=ical_venue,
+        artists="Night Owls",
+        status=EventStatus.APPROVED,
+        source="manual",
+    )
+
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        run_command()
+
+    assert Event.objects.filter(venue=ical_venue).count() == 1
+
+
+@pytest.mark.django_db
+def test_poll_bad_feed_does_not_crash_other_venues(db):
+    """A malformed feed for one venue does not stop other venues from polling."""
+    bad_venue = Venue.objects.create(
+        name="Bad Venue",
+        ical_feed_url="https://bad.example.com/broken.ics",
+    )
+    good_venue = Venue.objects.create(
+        name="Good Venue",
+        ical_feed_url="https://good.example.com/feed.ics",
+    )
+    good_feed = make_ical([{"summary": "Good Show", "dtstart": "20260310T200000Z"}])
+
+    def fake_urlopen(req, timeout=None):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        if "bad" in url:
+            raise urllib.error.URLError("connection refused")
+        return mock_fetch(good_feed)
+
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        side_effect=fake_urlopen,
+    ):
+        out, err = run_command()
+
+    assert Event.objects.filter(name="Good Show").exists()
+    assert not Event.objects.filter(venue=bad_venue).exists()
+    assert "Feed error" in err
+
+
+@pytest.mark.django_db
+def test_poll_stores_description_and_link(ical_venue):
+    """DESCRIPTION and URL from iCal are stored on the created event."""
+    feed = make_ical(
+        [
+            {
+                "summary": "Described Show",
+                "dtstart": "20260320T200000Z",
+                "description": "Great night of music",
+                "url": "https://tickets.example.com/show",
+            }
+        ]
+    )
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        run_command()
+
+    event = Event.objects.get(name="Described Show")
+    assert event.notes == "Great night of music"
+    assert event.link == "https://tickets.example.com/show"
+
+
+@pytest.mark.django_db
+def test_poll_handles_date_only_dtstart(ical_venue):
+    """Date-only DTSTART (no time component) is imported as midnight UTC."""
+    feed = make_ical([{"summary": "Date Only Show", "dtstart": "20260325"}])
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        run_command()
+
+    assert Event.objects.filter(name="Date Only Show").exists()
+    event = Event.objects.get(name="Date Only Show")
+    assert event.datetime.hour == 0
+    assert event.datetime.minute == 0
+
+
+@pytest.mark.django_db
+def test_poll_dry_run_does_not_create_events(ical_venue):
+    """--dry-run reports events without writing them."""
+    feed = make_ical([{"summary": "Dry Run Show", "dtstart": "20260310T200000Z"}])
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        return_value=mock_fetch(feed),
+    ):
+        out, _ = run_command(dry_run=True)
+
+    assert not Event.objects.filter(name="Dry Run Show").exists()
+    assert "dry-run" in out.lower()
+    ical_venue.refresh_from_db()
+    assert ical_venue.last_polled is None
+
+
+@pytest.mark.django_db
+def test_poll_skips_venues_without_feed(db):
+    """Venues without an ical_feed_url are ignored."""
+    Venue.objects.create(name="No Feed Venue", address="123 Main St")
+    out, _ = run_command()
+    assert "No venues with iCal feeds found" in out
+
+
+@pytest.mark.django_db
+def test_poll_venue_id_filter(db):
+    """--venue-id restricts polling to a single venue."""
+    venue_a = Venue.objects.create(
+        name="Venue A", ical_feed_url="https://a.example.com/feed.ics"
+    )
+    venue_b = Venue.objects.create(
+        name="Venue B", ical_feed_url="https://b.example.com/feed.ics"
+    )
+    feed_a = make_ical([{"summary": "Show A", "dtstart": "20260310T200000Z"}])
+    feed_b = make_ical([{"summary": "Show B", "dtstart": "20260310T200000Z"}])
+
+    def fake_urlopen(req, timeout=None):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        return mock_fetch(feed_a if "a.example" in url else feed_b)
+
+    with patch(
+        "events.management.commands.poll_ical_feeds.urllib.request.urlopen",
+        side_effect=fake_urlopen,
+    ):
+        run_command(venue_id=venue_a.pk)
+
+    assert Event.objects.filter(name="Show A").exists()
+    assert not Event.objects.filter(name="Show B").exists()
