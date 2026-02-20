@@ -18,7 +18,7 @@
 | Event models & admin moderation | ✅ Complete | Genre/Venue/Event models, rate limiting, approve/reject queue |
 | Event feed with filtering | ✅ Complete | Genre multi-select, date presets, no-reload updates |
 | Event detail page & submission form | ✅ Complete | OG tags, Google Maps links, share buttons, anonymous submission |
-| iCal feed ingestion worker | 📋 Planned | |
+| iCal feed ingestion worker | ✅ Complete | Management command, --dry-run, --venue-id, per-feed error handling, auto-approve |
 | Code review | 📋 Planned | |
 | Pre-launch verification | 📋 Planned | |
 | Deploy to production | 📋 Planned | |
