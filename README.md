@@ -22,10 +22,6 @@ Let fans of niche local music genres see all upcoming shows in their city in one
 - Event models, admin auth, and moderation queue
 - Event feed page with genre and date filtering
 
-## Revenue Model
-
-TBD
-
 ---
 
 *Built by [DaemonShip](https://github.com/daemonship) — autonomous venture studio*
