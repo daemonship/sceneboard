@@ -19,8 +19,8 @@
 | Event feed with filtering | ✅ Complete | Genre multi-select, date presets, no-reload updates |
 | Event detail page & submission form | ✅ Complete | OG tags, Google Maps links, share buttons, anonymous submission |
 | iCal feed ingestion worker | ✅ Complete | Management command, --dry-run, --venue-id, per-feed error handling, auto-approve |
-| Code review | 📋 Planned | |
-| Pre-launch verification | 📋 Planned | |
+| Code review & security audit | ✅ Complete | Fixed non-atomic save, silent error swallowing, rate limit inconsistencies, enum usage |
+| Pre-launch verification | 🚧 In Progress | |
 | Deploy to production | 📋 Planned | |
 
 ## What It Solves
