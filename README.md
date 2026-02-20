@@ -2,14 +2,32 @@
 
 > Discover local music events in your city. Filter by genre, date, and venue.
 
+## Feedback & Ideas
+
+> **This project is being built in public and we want to hear from you.**
+> Found a bug? Have a feature idea? Something feel wrong or missing?
+> **[Open an issue](../../issues)** — every piece of feedback directly shapes what gets built next.
+
+## Status
+
+> 🚧 In active development — not yet production ready
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Project scaffold & CI | ✅ Complete | Django 4.2, PostgreSQL, Fly.io, GitHub Actions |
+| Event models & admin moderation | ✅ Complete | Genre/Venue/Event models, rate limiting, approve/reject queue |
+| Event feed with filtering | ✅ Complete | Genre multi-select, date presets, no-reload updates |
+| Event detail page & submission form | 🚧 In Progress | |
+| iCal feed ingestion worker | 📋 Planned | |
+| Code review | 📋 Planned | |
+| Pre-launch verification | 📋 Planned | |
+| Deploy to production | 📋 Planned | |
+
 ## What It Solves
 
 Fans of niche local music genres can see all upcoming shows in their city in one place and submit shows they know about.
 
 ## MVP Scope
-
-### The One Thing
-Let fans discover all upcoming local music events in one place with easy filtering and submission.
 
 ### Included in MVP
 
@@ -52,17 +70,18 @@ cp .env.example .env
 
 # Edit .env and set your SECRET_KEY and database credentials
 
-# Run migrations
+# Run migrations (also seeds ~30 genre tags)
 python manage.py migrate
 
-# Create admin user (optional, for testing)
-python manage.py createsuperuser
+# Create admin user
+python manage.py createadmin
 
 # Run development server
 python manage.py runserver
 ```
 
-Visit http://localhost:8000 to see the site.
+Visit http://localhost:8000 to see the event feed.
+Visit http://localhost:8000/admin/ to access the moderation queue.
 
 ### Running Tests
 
@@ -72,9 +91,6 @@ pytest
 
 # Run with coverage
 pytest --cov=.
-
-# Run specific test file
-pytest tests.py
 ```
 
 ### Code Quality
@@ -100,19 +116,6 @@ flyctl auth login
 # Deploy
 flyctl deploy
 ```
-
-## Development Tasks
-
-| Task | Status | Description |
-|------|--------|-------------|
-| Task 1 | ✅ Complete | Initialize Django project skeleton |
-| Task 2 | ⏳ Pending | Event models, admin auth, and moderation queue |
-| Task 3 | ⏳ Pending | Event feed page with genre and date filtering |
-| Task 4 | ⏳ Pending | Event detail page and submission form |
-| Task 5 | ⏳ Pending | iCal feed ingestion worker |
-| Task 6 | ⏳ Pending | Code review |
-| Task 7 | ⏳ Pending | Pre-launch verification |
-| Task 8 | ⏳ Pending | Deploy to production |
 
 ## License
 
