@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}SceneBoard — Local Music Events{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+{% endblock %}
+
+{% block content %}
+<section class="feed-header">
+  <h1 class="feed-header__title">Local Music Events</h1>
+  <p class="feed-header__subtitle">Upcoming shows in your scene</p>
+</section>
+
+<div class="feed-layout">
+  <!-- Filter sidebar -->
+  <aside class="feed-filters" id="feed-filters">
+    <form class="filters-form" id="filters-form" method="get" action="">
+
+      <!-- Date range presets -->
+      <fieldset class="filter-group">
+        <legend class="filter-group__label">When</legend>
+        <div class="date-presets">
+          <button type="button"
+                  class="date-preset{% if not date_range %} date-preset--active{% endif %}"
+                  data-preset="">All upcoming</button>
+          {% for value, label in DATE_PRESETS %}
+          <button type="button"
+                  class="date-preset{% if date_range == value %} date-preset--active{% endif %}"
+                  data-preset="{{ value }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+        <input type="hidden" name="date_range" id="date-range-input" value="{{ date_range }}">
+      </fieldset>
+
+      <!-- Genre multi-select -->
+      <fieldset class="filter-group">
+        <legend class="filter-group__label">Genre</legend>
+        {% if selected_genres %}
+        <button type="button" class="clear-genres" id="clear-genres">Clear all</button>
+        {% endif %}
+        <div class="genre-checklist">
+          {% for genre in all_genres %}
+          <label class="genre-check">
+            <input type="checkbox"
+                   name="genres"
+                   value="{{ genre.slug }}"
+                   {% if genre.slug in selected_genres %}checked{% endif %}>
+            <span class="genre-check__label">{{ genre.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+    </form>
+  </aside>
+
+  <!-- Event list -->
+  <main class="feed-main" id="feed-main">
+    <div class="feed-toolbar">
+      <span class="feed-count" id="feed-count">
+        {{ events|length }} event{{ events|length|pluralize }}
+      </span>
+      <button class="filter-toggle" id="filter-toggle" aria-expanded="false" aria-controls="feed-filters">
+        Filters{% if selected_genres or date_range %} <span class="filter-badge">●</span>{% endif %}
+      </button>
+    </div>
+
+    <div id="event-list-container">
+      {% include "events/partials/event_list.html" %}
+    </div>
+  </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'js/feed.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% load tz %}{% if events %}
+<div class="events-grid" id="events-grid">
+  {% for event in events %}
+  <article class="event-card">
+    <div class="event-card__header">
+      <time class="event-card__date" datetime="{{ event.datetime|date:'c' }}">
+        <span class="event-card__day">{{ event.datetime|date:"D, M j" }}</span>
+        <span class="event-card__time">{{ event.datetime|time:"g:i A" }}</span>
+      </time>
+      {% if event.link %}
+      <a class="event-card__ticket-link" href="{{ event.link }}" target="_blank" rel="noopener noreferrer">Tickets</a>
+      {% endif %}
+    </div>
+
+    <h2 class="event-card__name">
+      <a href="{{ event.get_absolute_url }}">{{ event.name }}</a>
+    </h2>
+
+    <div class="event-card__venue">{{ event.venue.name }}</div>
+
+    {% if event.get_artists_list %}
+    <div class="event-card__artists">
+      {% for artist in event.get_artists_list %}
+      <span class="event-card__artist">{{ artist }}</span>{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if event.genre_tags.all %}
+    <div class="event-card__genres">
+      {% for genre in event.genre_tags.all %}
+      <a class="genre-chip genre-chip--link" href="?genres={{ genre.slug }}" data-genre="{{ genre.slug }}">{{ genre.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if event.source %}
+    <div class="event-card__source">via {{ event.source }}</div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="events-empty" id="events-grid">
+  <div class="events-empty__icon">🎸</div>
+  <h2 class="events-empty__heading">No shows found</h2>
+  <p class="events-empty__text">
+    {% if selected_genres or date_range %}
+      No events match your current filters. Try broadening your search.
+    {% else %}
+      Nothing on the calendar yet. Know about a show?
+    {% endif %}
+  </p>
+  <a class="btn btn--primary" href="#submit-show">Submit a Show</a>
+</div>
+{% endif %}

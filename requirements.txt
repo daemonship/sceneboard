@@ -1,0 +1,22 @@
+# Django core
+Django>=4.2,<5.0
+psycopg2-binary>=2.9.9
+python-decouple>=3.8
+dj-database-url>=2.1.0
+
+# Static files
+whitenoise>=6.6.0
+
+# iCal parsing (for Task 5)
+icalendar>=5.0.11
+
+# Development
+pytest>=7.4.3
+pytest-django>=4.7.0
+pytest-cov>=4.1.0
+black>=23.12.0
+flake8>=7.0.0
+isort>=5.13.2
+
+# Production
+gunicorn>=21.2.0
