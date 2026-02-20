@@ -20,8 +20,8 @@
 | Event detail page & submission form | ✅ Complete | OG tags, Google Maps links, share buttons, anonymous submission |
 | iCal feed ingestion worker | ✅ Complete | Management command, --dry-run, --venue-id, per-feed error handling, auto-approve |
 | Code review & security audit | ✅ Complete | Fixed non-atomic save, silent error swallowing, rate limit inconsistencies, enum usage |
-| Pre-launch verification | 🚧 In Progress | |
-| Deploy to production | 📋 Planned | |
+| Pre-launch verification | ✅ Complete | All checks pass, 36 tests green |
+| Deploy to production | 🚧 In Progress | |
 
 ## What It Solves
 
