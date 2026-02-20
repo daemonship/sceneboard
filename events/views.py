@@ -1,6 +1,8 @@
-from django.shortcuts import get_object_or_404, render
+from django.contrib import messages
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from .forms import EventSubmissionForm
 from .models import Event, EventStatus, Genre
 
 
@@ -86,3 +88,54 @@ def event_detail(request, slug):
     """Public detail page for a single event."""
     event = get_object_or_404(Event, slug=slug, status=EventStatus.APPROVED)
     return render(request, "events/detail.html", {"event": event})
+
+
+def _get_client_ip(request):
+    """Get the client's IP address, handling proxies."""
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(",")[0].strip()
+    else:
+        ip = request.META.get("REMOTE_ADDR")
+    return ip
+
+
+def event_submit(request):
+    """
+    Anonymous event submission form.
+    Creates events with pending status for moderation.
+    Rate limiting is enforced by middleware.
+    """
+    # Check if user is rate limited (middleware sets this flag)
+    # We also check here to show a friendly message instead of the form
+    from django.core.cache import cache
+
+    client_ip = _get_client_ip(request)
+    cache_key = f"rate_limit:submit:{client_ip}"
+    current_count = cache.get(cache_key, 0)
+    max_submissions = 20
+
+    rate_limited = current_count >= max_submissions
+
+    if request.method == "POST" and not rate_limited:
+        form = EventSubmissionForm(request.POST)
+        if form.is_valid():
+            event = form.save(commit=False)
+            event.submitter_ip = client_ip
+            event.save()
+            form.save_m2m()
+
+            messages.success(
+                request,
+                "Thank you! Your event has been submitted and is awaiting moderation. "
+                "It will appear on the site once approved."
+            )
+            return redirect("event_feed")
+    else:
+        form = EventSubmissionForm()
+
+    return render(
+        request,
+        "events/submit.html",
+        {"form": form, "rate_limited": rate_limited}
+    )

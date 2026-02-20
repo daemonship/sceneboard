@@ -32,8 +32,8 @@ jobs:
         image: postgres:15
         env:
           POSTGRES_DB: sceneboard_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password_placeholder
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -53,8 +53,8 @@ jobs:
       - name: Run tests
         env:
           DB_NAME: sceneboard_test
-          DB_USER: postgres
-          DB_PASSWORD: postgres
+          DB_USER: test_user
+          DB_PASSWORD: test_password_placeholder
           DB_HOST: localhost
           DB_PORT: 5432
           SECRET_KEY: test-secret-key

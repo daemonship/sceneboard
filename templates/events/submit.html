@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}Submit an Event — SceneBoard{% endblock %}
+
+{% block extra_head %}
+<meta name="description" content="Submit a local music event to SceneBoard. Share shows with your community.">
+<link rel="stylesheet" href="/static/css/submit.css">
+{% endblock %}
+
+{% block content %}
+<section class="submit-header">
+  <h1 class="submit-header__title">Submit a Show</h1>
+  <p class="submit-header__subtitle">Share a local music event with the community</p>
+</section>
+
+{% if messages %}
+<div class="messages">
+  {% for message in messages %}
+  <div class="message message--{{ message.tags }}">{{ message }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if rate_limited %}
+<div class="rate-limit-notice">
+  <h2>Submission Limit Reached</h2>
+  <p>You have submitted the maximum number of events (20) in the last 24 hours.</p>
+  <p>Please try again tomorrow. If you need to submit more events urgently, contact the site administrator.</p>
+  <a href="{% url 'event_feed' %}" class="btn btn--primary">Back to Events</a>
+</div>
+{% else %}
+<form class="submit-form" method="post" action="{% url 'event_submit' %}">
+  {% csrf_token %}
+
+  {% if form.non_field_errors %}
+  <div class="form-errors">
+    {% for error in form.non_field_errors %}
+    <p class="form-error">{{ error }}</p>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <fieldset class="form-fieldset">
+    <legend>Event Details</legend>
+
+    <div class="form-group{% if form.name.errors %} form-group--error{% endif %}">
+      <label for="{{ form.name.id_for_label }}" class="form-label">
+        Event Name <span class="required">*</span>
+      </label>
+      {{ form.name }}
+      {% if form.name.errors %}
+      <span class="field-error">{{ form.name.errors.0 }}</span>
+      {% endif %}
+      <span class="form-help">e.g., "Summer Rock Festival" or "Jazz Night at The Blue Note"</span>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group{% if form.datetime.errors %} form-group--error{% endif %}">
+        <label for="{{ form.datetime.id_for_label }}" class="form-label">
+          Date & Time <span class="required">*</span>
+        </label>
+        {{ form.datetime }}
+        {% if form.datetime.errors %}
+        <span class="field-error">{{ form.datetime.errors.0 }}</span>
+        {% endif %}
+        <span class="form-help">Times are in your local timezone</span>
+      </div>
+
+      <div class="form-group{% if form.venue.errors %} form-group--error{% endif %}">
+        <label for="{{ form.venue.id_for_label }}" class="form-label">
+          Venue <span class="required">*</span>
+        </label>
+        {{ form.venue }}
+        {% if form.venue.errors %}
+        <span class="field-error">{{ form.venue.errors.0 }}</span>
+        {% endif %}
+        <span class="form-help">Select the venue where the show is happening</span>
+      </div>
+    </div>
+
+    <div class="form-group{% if form.artists.errors %} form-group--error{% endif %}">
+      <label for="{{ form.artists.id_for_label }}" class="form-label">
+        Artists <span class="required">*</span>
+      </label>
+      {{ form.artists }}
+      {% if form.artists.errors %}
+      <span class="field-error">{{ form.artists.errors.0 }}</span>
+      {% endif %}
+      <span class="form-help">List performing artists, one per line</span>
+    </div>
+
+    <div class="form-group{% if form.genre_tags.errors %} form-group--error{% endif %}">
+      <label class="form-label">Genres</label>
+      <div class="genre-checklist">
+        {% for checkbox in form.genre_tags %}
+        <label class="genre-check">
+          {{ checkbox.tag }}
+          <span class="genre-check__label">{{ checkbox.choice_label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      {% if form.genre_tags.errors %}
+      <span class="field-error">{{ form.genre_tags.errors.0 }}</span>
+      {% endif %}
+    </div>
+  </fieldset>
+
+  <fieldset class="form-fieldset">
+    <legend>Additional Information</legend>
+
+    <div class="form-group{% if form.link.errors %} form-group--error{% endif %}">
+      <label for="{{ form.link.id_for_label }}" class="form-label">
+        Event Link
+      </label>
+      {{ form.link }}
+      {% if form.link.errors %}
+      <span class="field-error">{{ form.link.errors.0 }}</span>
+      {% endif %}
+      <span class="form-help">Link to tickets, event page, or band website</span>
+    </div>
+
+    <div class="form-group{% if form.notes.errors %} form-group--error{% endif %}">
+      <label for="{{ form.notes.id_for_label }}" class="form-label">
+        Notes
+      </label>
+      {{ form.notes }}
+      {% if form.notes.errors %}
+      <span class="field-error">{{ form.notes.errors.0 }}</span>
+      {% endif %}
+      <span class="form-help">Any additional details (age restrictions, cover charge, etc.)</span>
+    </div>
+  </fieldset>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--primary btn--large">Submit Event</button>
+    <a href="{% url 'event_feed' %}" class="btn btn--secondary">Cancel</a>
+  </div>
+
+  <p class="form-notice">
+    <small>
+      Your submission will be reviewed by a moderator before appearing on the site.
+      You can submit up to 20 events per day.
+    </small>
+  </p>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/submit.js"></script>
+{% endblock %}

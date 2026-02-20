@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load tz %}
+
+{% block title %}{{ event.name }} — {{ event.venue.name }} — SceneBoard{% endblock %}
+
+{% block extra_head %}
+<!-- Open Graph meta tags for social sharing -->
+<meta property="og:title" content="{{ event.name }} at {{ event.venue.name }}">
+<meta property="og:description" content="{{ event.datetime|date:'l, F j' }} at {{ event.datetime|time:'g:i A' }} — {{ event.get_artists_list|join:', ' }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ request.build_absolute_uri }}">
+<meta property="og:site_name" content="SceneBoard">
+<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}/static/images/sceneboard-og.png">
+<meta property="og:locale" content="en_US">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{{ event.name }} at {{ event.venue.name }}">
+<meta name="twitter:description" content="{{ event.datetime|date:'l, F j' }} at {{ event.datetime|time:'g:i A' }}">
+<meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}/static/images/sceneboard-og.png">
+
+<link rel="canonical" href="{{ request.build_absolute_uri }}">
+<link rel="stylesheet" href="/static/css/detail.css">
+{% endblock %}
+
+{% block content %}
+<article class="event-detail">
+  <header class="event-detail__header">
+    <time class="event-detail__datetime" datetime="{{ event.datetime|date:'c' }}">
+      <span class="event-detail__date">{{ event.datetime|date:"l, F j, Y" }}</span>
+      <span class="event-detail__time">{{ event.datetime|time:"g:i A" }}</span>
+    </time>
+
+    <h1 class="event-detail__name">{{ event.name }}</h1>
+
+    <div class="event-detail__venue">
+      <span class="event-detail__venue-name">{{ event.venue.name }}</span>
+      {% if event.venue.address %}
+      <a class="event-detail__map-link"
+         href="https://www.google.com/maps/search/?api=1&query={{ event.venue.name|urlencode }}+{{ event.venue.address|urlencode }}"
+         target="_blank"
+         rel="noopener noreferrer">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+        View on Google Maps
+      </a>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if event.get_artists_list %}
+  <section class="event-detail__section">
+    <h2 class="event-detail__section-title">Artists</h2>
+    <ul class="event-detail__artists">
+      {% for artist in event.get_artists_list %}
+      <li class="event-detail__artist">{{ artist }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if event.genre_tags.all %}
+  <section class="event-detail__section">
+    <h2 class="event-detail__section-title">Genres</h2>
+    <div class="event-detail__genres">
+      {% for genre in event.genre_tags.all %}
+      <a class="genre-chip genre-chip--link" href="{% url 'event_feed' %}?genres={{ genre.slug }}">{{ genre.name }}</a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if event.notes %}
+  <section class="event-detail__section">
+    <h2 class="event-detail__section-title">Notes</h2>
+    <div class="event-detail__notes">{{ event.notes|linebreaksbr }}</div>
+  </section>
+  {% endif %}
+
+  {% if event.link %}
+  <section class="event-detail__section">
+    <a class="btn btn--primary btn--large" href="{{ event.link }}" target="_blank" rel="noopener noreferrer">
+      Get Tickets / More Info
+    </a>
+  </section>
+  {% endif %}
+
+  {% if event.source %}
+  <footer class="event-detail__footer">
+    <p class="event-detail__source">Source: {{ event.source }}</p>
+  </footer>
+  {% endif %}
+</article>
+
+<section class="share-section">
+  <h2 class="share-section__title">Share this event</h2>
+  <div class="share-buttons">
+    <button class="share-btn" data-action="copy-link" data-url="{{ request.build_absolute_uri }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      Copy Link
+    </button>
+    <a class="share-btn share-btn--twitter"
+       href="https://twitter.com/intent/tweet?text={{ event.name|urlencode }}+at+{{ event.venue.name|urlencode }}&url={{ request.build_absolute_uri|urlencode }}"
+       target="_blank"
+       rel="noopener noreferrer">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg>
+      Share on X
+    </a>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="/static/js/detail.js"></script>
+{% endblock %}
